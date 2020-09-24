@@ -15,82 +15,101 @@ library(dbplyr)
 library(rvest)
 ```
 
-## Scraping Data from Congress.gov
+## Scraping Data from Congress.gov (Page 1)
 
 ```{r}
-url <- paste0("https://www.congress.gov/search?q=",
+url1 <- paste0("https://www.congress.gov/search?q=",
               "{%22source%22:%22treaties%22}",
               "&searchResultViewType=expanded&pageSort=actionAsc&pageSize=250")
+url1_treaty <- read_html(url1)
 
-url_treaty <- read_html(url)
+# Website scraping
 
-body_nodes <- url_treaty %>%
+body_nodes1 <- url1_treaty %>%
   html_node("body") %>%
   html_children()
-
-treaty_names <- url_treaty %>%
+treaty1_names <- url1_treaty %>%
   html_nodes("body") %>%
   xml_find_all("//span[contains(@class, 'result-heading')]") %>%
   html_text()
-
-treaty_values_all <- url_treaty %>%
+treaty1_values_all <- url1_treaty %>%
   html_nodes("body") %>%
   xml_find_all("//span[contains(@class, 'result-item')]") %>%
   html_text()
-```
 
-## Cleaning Up Spaces and Text
+# Cleaning up "\n" and large space gaps
 
-```{r}
-treaty_values_notext <- str_subset(treaty_values_all,
+treaty1_values_notext <- str_subset(treaty1_values_all,
                                    pattern = "Text of Treaty Document",
                                    negate = TRUE)
-
-treaty_notext_1spaces <- str_replace(treaty_values_notext,
+treaty1_notext_1spaces <- str_replace(treaty1_values_notext,
                                      pattern = "\n        ",
                                      replacement = "")
-
-treaty_notext_2spaces <- str_replace(treaty_notext_1spaces, 
+treaty1_notext_2spaces <- str_replace(treaty1_notext_1spaces, 
                                      pattern = "\n        ",
                                      replacement =  " ")
-
-treaty_notext_3spaces <- str_replace(treaty_notext_2spaces,
+treaty1_notext_3spaces <- str_replace(treaty1_notext_2spaces,
                                      pattern = "Document Type:\n",
                                      replacement = "")
-
-treaty_notext_4spaces <- str_replace(treaty_notext_3spaces,
+treaty1_notext_4spaces <- str_replace(treaty1_notext_3spaces,
                                      pattern = "\n",
                                      replacement = "")
-
-treaty_notext_5spaces <- str_replace(treaty_notext_4spaces,
+treaty1_notext_5spaces <- str_replace(treaty1_notext_4spaces,
                                      pattern = "TXT\n",
                                      replacement = "")
-
-treaty_notext_6spaces <- str_replace(treaty_notext_5spaces,
+treaty1_notext_6spaces <- str_replace(treaty1_notext_5spaces,
                                      pattern = "\n            ",
                                      replacement = "")
-
-treaty_notext_7spaces <- str_replace(treaty_notext_6spaces,
+treaty1_notext_7spaces <- str_replace(treaty1_notext_6spaces,
                                      pattern = "\n",
                                      replacement = "")
+
+# Setting up data for making a vector
+
+treaty1_action0 <- str_subset(treaty1_notext_7spaces, 
+                              pattern = "Latest Senate Action")
+
+type_NAMark <- str_subset(treaty1_notext_7spaces, pattern = "Date Received", 
+           negate = TRUE)[c(TRUE, FALSE)]
+type_half <- str_subset(type_NAMark, pattern = "Treaty")[c(TRUE, FALSE)]
+
+type_indices <- which(str_detect(wsw, pattern = "Treaty"))
+NAMark_indices <- which(str_detect(type_NAMark, pattern = "Senate"))
+
+type_indices2 <- type_indices[c(TRUE, FALSE)]
+
+blank_chr_500 <- vector(mode = "character", length = 500)
+NAFill_55 <- rep("Treaty Type: Other", 55)
+
+blank_chr_500[NAMark_indices] = NAFill_55
+
+blank_chr_500[type_indices2] = type_half
+
+blank_chr_500[blank_chr_500 != ""]
+
+# Making vectors for the data frame
+
+treaty1_title <- treaty1_names[c(TRUE, FALSE)]
+treaty1_document <- treaty1_names[c(FALSE, TRUE)]
+treaty1_pres_date <- str_subset(treaty1_notext_7spaces,
+                                pattern = "Date Received from President")
+treaty1_date <- str_subset(treaty1_notext_7spaces,
+                           pattern = "Date Received: ")
+treaty1_action <- treaty1_action0[c(TRUE, FALSE)]
+treaty1_type <- blank_chr_500[blank_chr_500 != ""]
+
+# Making a data frame for page 1
+
+page1 <- data.frame(treaty1_title, treaty1_document, treaty1_pres_date, 
+                    treaty1_date, treaty1_action, treaty1_type)
+
+View(page1)
 ```
 
-## Creating useful vectors
+
+## Scraping Data from Congress.gov (Page 2)
 
 ```{r}
-treaty_title <- treaty_names[c(TRUE, FALSE)]
 
-treaty_document <- treaty_names[c(FALSE, TRUE)]
-
-treaty_pres_date <- str_subset(treaty_notext_7spaces,
-                               pattern = "Date Received from President")
-
-treaty_date <- str_subset(treaty_notext_7spaces,
-                          pattern = "Date Received: ")
-
-treaty_action0 <- str_subset(treaty_notext_7spaces, 
-                            pattern = "Latest Senate Action")
-
-treaty_action <- treaty_action0[c(TRUE, FALSE)]
 ```
 
