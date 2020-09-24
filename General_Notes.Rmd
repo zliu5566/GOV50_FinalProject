@@ -1,0 +1,96 @@
+---
+title: "General Notes"
+author: "Zelin Liu"
+date: "9/23/2020"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(rvest)
+library(ggplot2)
+library(tidyverse)
+library(dbplyr)
+library(rvest)
+```
+
+## Scraping Data from Congress.gov
+
+```{r}
+url <- paste0("https://www.congress.gov/search?q=",
+              "{%22source%22:%22treaties%22}",
+              "&searchResultViewType=expanded&pageSort=actionAsc&pageSize=250")
+
+url_treaty <- read_html(url)
+
+body_nodes <- url_treaty %>%
+  html_node("body") %>%
+  html_children()
+
+treaty_names <- url_treaty %>%
+  html_nodes("body") %>%
+  xml_find_all("//span[contains(@class, 'result-heading')]") %>%
+  html_text()
+
+treaty_values_all <- url_treaty %>%
+  html_nodes("body") %>%
+  xml_find_all("//span[contains(@class, 'result-item')]") %>%
+  html_text()
+```
+
+## Cleaning Up Spaces and Text
+
+```{r}
+treaty_values_notext <- str_subset(treaty_values_all,
+                                   pattern = "Text of Treaty Document",
+                                   negate = TRUE)
+
+treaty_notext_1spaces <- str_replace(treaty_values_notext,
+                                     pattern = "\n        ",
+                                     replacement = "")
+
+treaty_notext_2spaces <- str_replace(treaty_notext_1spaces, 
+                                     pattern = "\n        ",
+                                     replacement =  " ")
+
+treaty_notext_3spaces <- str_replace(treaty_notext_2spaces,
+                                     pattern = "Document Type:\n",
+                                     replacement = "")
+
+treaty_notext_4spaces <- str_replace(treaty_notext_3spaces,
+                                     pattern = "\n",
+                                     replacement = "")
+
+treaty_notext_5spaces <- str_replace(treaty_notext_4spaces,
+                                     pattern = "TXT\n",
+                                     replacement = "")
+
+treaty_notext_6spaces <- str_replace(treaty_notext_5spaces,
+                                     pattern = "\n            ",
+                                     replacement = "")
+
+treaty_notext_7spaces <- str_replace(treaty_notext_6spaces,
+                                     pattern = "\n",
+                                     replacement = "")
+```
+
+## Creating useful vectors
+
+```{r}
+treaty_title <- treaty_names[c(TRUE, FALSE)]
+
+treaty_document <- treaty_names[c(FALSE, TRUE)]
+
+treaty_pres_date <- str_subset(treaty_notext_7spaces,
+                               pattern = "Date Received from President")
+
+treaty_date <- str_subset(treaty_notext_7spaces,
+                          pattern = "Date Received: ")
+
+treaty_action0 <- str_subset(treaty_notext_7spaces, 
+                            pattern = "Latest Senate Action")
+
+treaty_action <- treaty_action0[c(TRUE, FALSE)]
+```
+
