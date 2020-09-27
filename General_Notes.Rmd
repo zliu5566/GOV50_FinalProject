@@ -74,17 +74,14 @@ type_NAMark <- str_subset(treaty1_notext_7spaces, pattern = "Date Received",
 type_half <- str_subset(type_NAMark, pattern = "Treaty")[c(TRUE, FALSE)]
 
 type_indices <- which(str_detect(wsw, pattern = "Treaty"))
-NAMark_indices <- which(str_detect(type_NAMark, pattern = "Senate"))
-
 type_indices2 <- type_indices[c(TRUE, FALSE)]
+NAMark_indices <- which(str_detect(type_NAMark, pattern = "Senate"))
 
 blank_chr_500 <- vector(mode = "character", length = 500)
 NAFill_55 <- rep("Treaty Type: Other", 55)
 
 blank_chr_500[NAMark_indices] = NAFill_55
-
 blank_chr_500[type_indices2] = type_half
-
 blank_chr_500[blank_chr_500 != ""]
 
 # Making vectors for the data frame
@@ -101,7 +98,10 @@ treaty1_type <- blank_chr_500[blank_chr_500 != ""]
 # Making a data frame for page 1
 
 page1 <- data.frame(treaty1_title, treaty1_document, treaty1_pres_date, 
-                    treaty1_date, treaty1_action, treaty1_type)
+                    treaty1_date, treaty1_action, treaty1_type) %>%
+  rename(title = treaty1_title, document = treaty1_document, 
+         date_pres = treaty1_pres_date, date = treaty1_date, 
+         senate_action = treaty1_action, category = treaty1_type)
 
 View(page1)
 ```
@@ -110,6 +110,104 @@ View(page1)
 ## Scraping Data from Congress.gov (Page 2)
 
 ```{r}
+url2 <- paste0()
+url2_treaty <- read_html(url2)
 
+# Website scraping
+
+body_nodes2 <- url2_treaty %>%
+  html_node("body") %>%
+  html_children()
+treaty2_names <- url2_treaty %>%
+  html_nodes("body") %>%
+  xml_find_all("//span[contains(@class, 'result-heading')]") %>%
+  html_text()
+treaty2_values_all <- url2_treaty %>%
+  html_nodes("body") %>%
+  xml_find_all("//span[contains(@class, 'result-item')]") %>%
+  html_text()
+
+# Cleaning up "\n" and large space gaps
+
+# Setting up data for making a vector
+
+# Making vectors for the data frame
+
+# Making a data frame for page 2
+
+page2 <- data.frame() %>%
+  rename(title, document, date_pres, date, senate_action, category)
+
+View(page2)
+```
+
+
+## Scraping Data from Congress.gov (Page 3)
+
+```{r}
+url3 <- paste0()
+url3_treaty <- read_html(url3)
+
+# Website scraping
+
+body_nodes3 <- url3_treaty %>%
+  html_node("body") %>%
+  html_children()
+treaty3_names <- url3_treaty %>%
+  html_nodes("body") %>%
+  xml_find_all("//span[contains(@class, 'result-heading')]") %>%
+  html_text()
+treaty3_values_all <- url3_treaty %>%
+  html_nodes("body") %>%
+  xml_find_all("//span[contains(@class, 'result-item')]") %>%
+  html_text()
+
+# Cleaning up "\n" and large space gaps
+
+# Setting up data for making a vector
+
+# Making vectors for the data frame
+
+# Making a data frame for page 2
+
+page3 <- data.frame() %>%
+  rename(title, document, date_pres, date, senate_action, category)
+
+View(page3)
+```
+
+
+## Scraping Data from Congress.gov (Page 4)
+
+```{r}
+url4 <- paste0()
+url4_treaty <- read_html(url4)
+
+# Website scraping
+
+body_nodes4 <- url4_treaty %>%
+  html_node("body") %>%
+  html_children()
+treaty4_names <- url4_treaty %>%
+  html_nodes("body") %>%
+  xml_find_all("//span[contains(@class, 'result-heading')]") %>%
+  html_text()
+treaty4_values_all <- url4_treaty %>%
+  html_nodes("body") %>%
+  xml_find_all("//span[contains(@class, 'result-item')]") %>%
+  html_text()
+
+# Cleaning up "\n" and large space gaps
+
+# Setting up data for making a vector
+
+# Making vectors for the data frame
+
+# Making a data frame for page 2
+
+page4 <- data.frame() %>%
+  rename(title, document, date_pres, date, senate_action, category)
+
+View(page4)
 ```
 
