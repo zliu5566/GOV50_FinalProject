@@ -13,10 +13,10 @@ library(ggplot2)
 library(tidyverse)
 library(dbplyr)
 library(rvest)
+library(janitor)
 ```
 
 ## Scraping Data from Congress.gov (Page 1)
-
 ```{r}
 url1 <- paste0("https://www.congress.gov/search?q=",
               "{%22source%22:%22treaties%22}",
@@ -25,9 +25,10 @@ url1_treaty <- read_html(url1)
 
 # Website scraping
 
-body_nodes1 <- url1_treaty %>%
-  html_node("body") %>%
-  html_children()
+#body_nodes1 <- url1_treaty %>%
+#  html_node("body") %>%
+#  html_children()
+
 treaty1_names <- url1_treaty %>%
   html_nodes("body") %>%
   xml_find_all("//span[contains(@class, 'result-heading')]") %>%
@@ -43,26 +44,21 @@ treaty1_values_notext <- str_subset(treaty1_values_all,
                                    pattern = "Text of Treaty Document",
                                    negate = TRUE)
 treaty1_notext_1spaces <- str_replace(treaty1_values_notext,
-                                     pattern = "\n        ",
-                                     replacement = "")
+                                     pattern = "\n        ", replacement = "")
 treaty1_notext_2spaces <- str_replace(treaty1_notext_1spaces, 
-                                     pattern = "\n        ",
-                                     replacement =  " ")
+                                     pattern = "\n        ", replacement =  " ")
 treaty1_notext_3spaces <- str_replace(treaty1_notext_2spaces,
                                      pattern = "Document Type:\n",
                                      replacement = "")
 treaty1_notext_4spaces <- str_replace(treaty1_notext_3spaces,
-                                     pattern = "\n",
-                                     replacement = "")
+                                     pattern = "\n", replacement = "")
 treaty1_notext_5spaces <- str_replace(treaty1_notext_4spaces,
-                                     pattern = "TXT\n",
-                                     replacement = "")
+                                     pattern = "TXT\n", replacement = "")
 treaty1_notext_6spaces <- str_replace(treaty1_notext_5spaces,
                                      pattern = "\n            ",
                                      replacement = "")
 treaty1_notext_7spaces <- str_replace(treaty1_notext_6spaces,
-                                     pattern = "\n",
-                                     replacement = "")
+                                     pattern = "\n", replacement = "")
 
 # Setting up data for making a vector
 
@@ -73,7 +69,7 @@ type_NAMark <- str_subset(treaty1_notext_7spaces, pattern = "Date Received",
            negate = TRUE)[c(TRUE, FALSE)]
 type_half <- str_subset(type_NAMark, pattern = "Treaty")[c(TRUE, FALSE)]
 
-type_indices <- which(str_detect(wsw, pattern = "Treaty"))
+type_indices <- which(str_detect(type_NAMark, pattern = "Treaty"))
 type_indices2 <- type_indices[c(TRUE, FALSE)]
 NAMark_indices <- which(str_detect(type_NAMark, pattern = "Senate"))
 
@@ -82,7 +78,7 @@ NAFill_55 <- rep("Treaty Type: Other", 55)
 
 blank_chr_500[NAMark_indices] = NAFill_55
 blank_chr_500[type_indices2] = type_half
-blank_chr_500[blank_chr_500 != ""]
+# blank_chr_500[blank_chr_500 != ""]
 
 # Making vectors for the data frame
 
@@ -101,113 +97,117 @@ page1 <- data.frame(treaty1_title, treaty1_document, treaty1_pres_date,
                     treaty1_date, treaty1_action, treaty1_type) %>%
   rename(title = treaty1_title, document = treaty1_document, 
          date_pres = treaty1_pres_date, date = treaty1_date, 
-         senate_action = treaty1_action, category = treaty1_type)
+         senate_action = treaty1_action, topic = treaty1_type) %>%
+  select(-date_pres)
 
-View(page1)
+page1 <- page1[c(1, 2, 3, 5, 4)]
 ```
 
 
 ## Scraping Data from Congress.gov (Page 2)
-
 ```{r}
-url2 <- paste0()
+# Writing a function
+create_row_from_treaty = function(treaty) {
+  title = treaty %>%
+    xml_find_first("span[@class='result-heading']") %>%
+    html_text() %>%
+    str_trim()
+  
+  document = treaty %>%
+    xml_find_first("span[@class='result-title']") %>%
+    html_text() %>%
+    str_trim()
+  
+  items_names = treaty %>%
+    xml_find_all("span[@class='result-item']/strong") %>%
+    html_text() %>%
+    str_trim() %>%
+    str_sub(end = -2)
+  
+  items_content = treaty %>%
+    xml_find_all("span[@class='result-item']") %>%
+    html_text() %>%
+    str_trim() %>%
+    str_sub(str_length(items_names) + 2) %>%
+    str_trim()
+  
+  pmap_dfc(list(column_names = c("title", "document", items_names),
+                row_content = c(title, document, items_content)),
+           ~ tibble(!!.x := .y))
+}
+
+# Webscraping
+url2 <- paste0("https://www.congress.gov/search?q=",
+               "{%22source%22:%22treaties%22}", 
+               "&searchResultViewType=expanded&pageSort=", 
+               "actionAsc&pageSize=250&page=2")
 url2_treaty <- read_html(url2)
 
-# Website scraping
+page2_treaties_all <- url2_treaty %>%
+  xml_find_all('//*[@id="main"]/ol/li[@class = "expanded"]')
 
-body_nodes2 <- url2_treaty %>%
-  html_node("body") %>%
-  html_children()
-treaty2_names <- url2_treaty %>%
-  html_nodes("body") %>%
-  xml_find_all("//span[contains(@class, 'result-heading')]") %>%
-  html_text()
-treaty2_values_all <- url2_treaty %>%
-  html_nodes("body") %>%
-  xml_find_all("//span[contains(@class, 'result-item')]") %>%
-  html_text()
+# Making Table
+treaties2 = page2_treaties_all %>%
+  map_dfr(create_row_from_treaty)
 
-# Cleaning up "\n" and large space gaps
-
-# Setting up data for making a vector
-
-# Making vectors for the data frame
-
-# Making a data frame for page 2
-
-page2 <- data.frame() %>%
-  rename(title, document, date_pres, date, senate_action, category)
-
-View(page2)
+page2 <- treaties2 %>%
+  clean_names() %>%
+  select(-text_of_treaty_document) %>%
+  rename(date = date_received_from_president, topic = treaty_topic, 
+         senate_action = latest_senate_action)
 ```
 
 
 ## Scraping Data from Congress.gov (Page 3)
-
 ```{r}
-url3 <- paste0()
+# Website scraping
+url3 <- paste0("https://www.congress.gov/search?q=", 
+               "{%22source%22:%22treaties%22}", 
+               "&searchResultViewType=expanded&pageSort=",
+               "actionAsc&pageSize=250&page=3")
 url3_treaty <- read_html(url3)
 
-# Website scraping
+page3_treaties_all <- url3_treaty %>%
+  xml_find_all('//*[@id="main"]/ol/li[@class = "expanded"]')
 
-body_nodes3 <- url3_treaty %>%
-  html_node("body") %>%
-  html_children()
-treaty3_names <- url3_treaty %>%
-  html_nodes("body") %>%
-  xml_find_all("//span[contains(@class, 'result-heading')]") %>%
-  html_text()
-treaty3_values_all <- url3_treaty %>%
-  html_nodes("body") %>%
-  xml_find_all("//span[contains(@class, 'result-item')]") %>%
-  html_text()
+# Making Table
+treaties3 = page3_treaties_all %>%
+  map_dfr(create_row_from_treaty)
 
-# Cleaning up "\n" and large space gaps
-
-# Setting up data for making a vector
-
-# Making vectors for the data frame
-
-# Making a data frame for page 2
-
-page3 <- data.frame() %>%
-  rename(title, document, date_pres, date, senate_action, category)
-
-View(page3)
+page3 <- treaties3 %>%
+  clean_names() %>%
+  select(-text_of_treaty_document) %>%
+  rename(date = date_received_from_president, topic = treaty_topic, 
+         senate_action = latest_senate_action)
 ```
 
 
 ## Scraping Data from Congress.gov (Page 4)
-
 ```{r}
-url4 <- paste0()
+# Website scraping
+url4 <- paste0("https://www.congress.gov/search?q=",
+               "{%22source%22:%22treaties%22}", 
+               "&searchResultViewType=expanded&pageSort=", 
+               "actionAsc&pageSize=250&page=4")
 url4_treaty <- read_html(url4)
 
-# Website scraping
+page4_treaties_all <- url4_treaty %>%
+  xml_find_all('//*[@id="main"]/ol/li[@class = "expanded"]')
 
-body_nodes4 <- url4_treaty %>%
-  html_node("body") %>%
-  html_children()
-treaty4_names <- url4_treaty %>%
-  html_nodes("body") %>%
-  xml_find_all("//span[contains(@class, 'result-heading')]") %>%
-  html_text()
-treaty4_values_all <- url4_treaty %>%
-  html_nodes("body") %>%
-  xml_find_all("//span[contains(@class, 'result-item')]") %>%
-  html_text()
+# Making Table
+treaties4 = page4_treaties_all %>%
+  map_dfr(create_row_from_treaty)
 
-# Cleaning up "\n" and large space gaps
+page4 <- treaties4 %>%
+  clean_names() %>%
+  select(-text_of_treaty_document) %>%
+  rename(date = date_received_from_president, topic = treaty_topic, 
+         senate_action = latest_senate_action)
+```
 
-# Setting up data for making a vector
-
-# Making vectors for the data frame
-
-# Making a data frame for page 2
-
-page4 <- data.frame() %>%
-  rename(title, document, date_pres, date, senate_action, category)
-
-View(page4)
+## Combining pages to form a single table
+```{r}
+all_treaties_table_v1 <- rbind(page1, page2, page3, page4)
+all_treaties_table_v2 <- bind_rows(page1, page2, page3, page4)
 ```
 
