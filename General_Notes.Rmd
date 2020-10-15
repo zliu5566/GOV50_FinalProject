@@ -257,7 +257,9 @@ government_1949_2020 <- years_1949_2020 %>%
 treaties_government <- full_join(government_1949_2020, c_treaties_y, 
                                  by = "year")
 
-View(treaties_government)
+write.csv(treaties_government,"treaties_data_Oct15.csv")
+
+
 ```
 
 ## Graph Experimentation
