@@ -89,7 +89,8 @@ treaty1_pres_date <- str_subset(treaty1_notext_7spaces,
 treaty1_date <- str_subset(treaty1_notext_7spaces,
                            pattern = "Date Received: ")
 treaty1_action <- treaty1_action0[c(TRUE, FALSE)]
-treaty1_type <- blank_chr_500[blank_chr_500 != ""]
+treaty1_type <- blank_chr_500[blank_chr_500 != ""] %>%
+  str_trim()
 
 # Making a data frame for page 1
 
@@ -98,11 +99,14 @@ page1 <- data.frame(treaty1_title, treaty1_document, treaty1_pres_date,
   rename(title = treaty1_title, document = treaty1_document, 
          date_pres = treaty1_pres_date, date = treaty1_date, 
          senate_action = treaty1_action, topic = treaty1_type) %>%
-  select(-date_pres)
+  select(-date_pres) %>%
+  mutate(topic = str_replace(topic, "Treaty Topic: ", "")) %>%
+  mutate(topic = str_replace(topic, "Treaty Type: ", "")) %>%
+  mutate(topic = str_replace(topic, "Other", "NA")) %>%
+  mutate(date = str_replace(date, "Date Received: ", ""))
 
 page1 <- page1[c(1, 2, 3, 5, 4)]
 ```
-
 
 ## Scraping Data from Congress.gov (Page 2)
 ```{r}
@@ -157,7 +161,6 @@ page2 <- treaties2 %>%
          senate_action = latest_senate_action)
 ```
 
-
 ## Scraping Data from Congress.gov (Page 3)
 ```{r}
 # Website scraping
@@ -180,7 +183,6 @@ page3 <- treaties3 %>%
   rename(date = date_received_from_president, topic = treaty_topic, 
          senate_action = latest_senate_action)
 ```
-
 
 ## Scraping Data from Congress.gov (Page 4)
 ```{r}
@@ -207,7 +209,72 @@ page4 <- treaties4 %>%
 
 ## Combining pages to form a single table
 ```{r}
-all_treaties_table_v1 <- rbind(page1, page2, page3, page4)
-all_treaties_table_v2 <- bind_rows(page1, page2, page3, page4)
+all_treaties_v1 <- rbind(page1, page2, page3, page4)
+all_treaties_v2 <- bind_rows(page1, page2, page3, page4)
+
+# Cleaning table
+cleaned_treaties <- all_treaties_v1 %>%
+  mutate(topic = str_replace_na(topic, replacement = "NA")) %>%
+  mutate(document = str_replace(document, 
+                                "Senate Consideration of Treaty Document",
+                                "Treaty Document:")) %>%
+  mutate(date = as.Date(date, format = "%m/%d/%Y"))
+
+View(cleaned_treaties)
+```
+
+## Table Experimentation
+```{r}
+c_treaties_y <- cleaned_treaties %>%
+  mutate(year = format(date, "%Y")) %>%
+  mutate(year = as.integer(year))
+
+years_1949_2020 <- tibble(year = 1949:2020)
+
+presidents_1949_2020 <- c(rep("Truman", 4), rep("Eisenhower", 8), 
+                          rep("Kennedy", 2), rep("Kennedy/Johnson", 1),
+                          rep("Johnson", 5), rep("Nixon", 5), 
+                          rep("Nixon/Ford", 1), rep("Ford", 2), 
+                          rep("Carter", 4), rep("Reagan", 8), 
+                          rep("H.W. Bush", 4), rep("Clinton", 8), 
+                          rep("W. Bush", 8), rep("Obama", 8), rep("Trump", 4))
+
+congresses_1949_2020 <- c(rep(81:116, 2)) %>% 
+  sort()
+
+government_1949_2020 <- years_1949_2020 %>% 
+  mutate(president = presidents_1949_2020) %>%
+  mutate(pres_party = case_when(president %in% c("Truman", "Kennedy",
+                                                 "Kennedy/Johnson", "Johnson",
+                                                 "Carter", "Clinton", 
+                                                 "Obama") ~ "D", 
+                                TRUE ~ "R")) %>% 
+  mutate(congress = congresses_1949_2020) %>%
+  mutate(congress_party = case_when(congress %in% c(81:82, 84:96, 
+                                                    100:103, 110:113) ~ "D", 
+                                TRUE ~ "R"))
+
+treaties_government <- full_join(government_1949_2020, c_treaties_y, 
+                                 by = "year")
+
+View(treaties_government)
+```
+
+## Graph Experimentation
+```{r}
+cleaned_treaties %>%
+  mutate(year = format(date, "%Y")) %>%
+  group_by(year, topic) %>%
+  summarize(n(), .groups = "drop_last") %>%
+  ggplot(aes(x = year, fill = topic)) +
+  geom_bar() +
+  scale_fill_discrete(name = "Treaty Topic", 
+                      labels = c("Ag", "AC", "Av", "Cm", "Cn", "DS&A", "Dr", 
+                                 "En", "Ex", "Ex&CA", "F&W", "HR", "IP/C", "IL", 
+                                 "IL&O", "In", "La", "MB&C", "MLA", "NA", 
+                                 "S&MP", "Ta", "Tel", "Ter", "T/P", "UN")) +
+  theme_bw() +
+  #theme(legend.position = "top") +
+  theme(axis.text.x = element_text(size = 5))
 ```
 
