@@ -41,7 +41,7 @@ ui <- navbarPage(
                information about presidential terms and the dominant political
                party of the Senate for each Congress."),
              h3("About the Author"),
-             p("My name is Z. Liu and I study many things. 
+             p("My name is Z. Liu, and I study many things. 
              You can reach me when this project is done.")),
     tabPanel("Model",
              titlePanel("Model and Graphics"),
