@@ -14,50 +14,43 @@ library(dplyr, warn.conflicts = FALSE)
 library(ggforce)
 library(readr)
 
-d <- read_csv("https://projects.fivethirtyeight.com/2020-general-data/presidential_ev_probabilities_2020.csv",
-              col_types = cols(cycle = col_double(),
-                               branch = col_character(),
-                               model = col_character(),
-                               modeldate = col_character(),
-                               candidate_inc = col_character(),
-                               candidate_chal = col_character(),
-                               candidate_3rd = col_logical(),
-                               evprob_inc = col_double(),
-                               evprob_chal = col_double(),
-                               evprob_3rd = col_logical(),
-                               total_ev = col_double(),
-                               timestamp = col_character(),
-                               simulations = col_double())) %>% 
-    select(evprob_chal, evprob_inc, total_ev)
+d <- read_csv("treaties_data_Oct15.csv") %>% 
+    select(-title, -document, -date)
 
 # Define UI for application that draws a histogram
 ui <- navbarPage(
-    "Final Project Title",
-    tabPanel("Home", 
-             titlePanel("Welcome to my page"),
-             h3("Project Background and Motivations"),
-             p("Hello, this is where I talk about my project."),
-             h4("This heading is smaller"),
-             p("Here is a link to",
-               a("Google", href = "https://www.google.com"))),
+    "[Project Title Signed but Pending Senate Ratification]",
+    tabPanel("About", 
+             titlePanel("About My Project"),
+             h3("Project Overview"),
+             p("Hello, this project looks at U.S. international treaties from
+               1949 to 2020. Specifically, it examines the realtionship between
+               the U.S. Senate's willingness to pass a treaty and such factors 
+               as the sitting U.S. President, the dominant party in the Senate,
+               and whether or not one party holds both branches. In addition, 
+               this project also seeks to discover if there is any correlation 
+               between the Senate's willingness to ratify a treaty and the 
+               dollar amount of money it allocates for national defense 
+               purposes. I have always been fascinated by U.S. foreign policy, 
+               and international treaties seem to be one of the most 
+               prominent ways in which foreign policy is enacted."),
+             h3("Data Collection"),
+             p("I collected this data by scraping Congress.gov, which has the 
+               voting records of the U.S. Senate for every treaty that was 
+               submitted to that body since 1949. I then added to that dataset
+               information about presidential terms and the dominant political
+               party of the Senate for each Congress."),
+             h3("About the Author"),
+             p("My name is Z. Liu and I study many things. 
+             You can reach me when this project is done.")),
     tabPanel("Model",
+             titlePanel("Model and Graphics"),
              fluidPage(
-                 selectInput("x", "X variable", choices = names(d)),
-                 selectInput("y", "Y variable", choices = names(d)),
+                 selectInput("x", "X variable", names(d)),
+                 selectInput("y", "Y variable", names(d)),
                  selectInput("geom", "geom", c("point", "column", "jitter")),
                  plotOutput("plot")
-             )),
-    tabPanel("Discussion",
-             titlePanel("Discussion Title"),
-             p("Tour of the modeling choices you made and 
-              an explanation of why you made them")),
-    tabPanel("About", 
-             titlePanel("About"),
-             h3("Project Background and Motivations"),
-             p("Hello, this is where I talk about my project."),
-             h3("About Me"),
-             p("My name is ______ and I study ______. 
-             You can reach me at ______@college.harvard.edu."))
+             ))
 )
 
 # Define server logic required to draw a histogram
@@ -66,10 +59,10 @@ server <- function(input, output, session) {
         switch(input$geom,
                point = geom_point(),
                column = geom_col(),
-               jitter = geom_jitter()
+               jitter = geom_jitter(width = 0.2, height = 0.2, alpha = 0.5)
         )
     })
-    
+
     output$plot <- renderPlot({
         ggplot(d, aes(.data[[input$x]], .data[[input$y]])) +
             plot_geom()
