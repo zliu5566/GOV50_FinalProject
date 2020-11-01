@@ -1,0 +1,84 @@
+---
+title: "Military Spending"
+author: "Zelin Liu"
+date: "10/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(shiny)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(ggforce)
+library(readr)
+library(readxl)
+```
+
+## Wrangling
+```{r}
+d <- read_excel("hist03z1_fy21.xlsx", skip = 1)
+spending <- d %>% 
+  select(`Superfunction and Function`, "1949":"2019") %>%
+  pivot_longer(!`Superfunction and Function`, names_to = "year", 
+               values_to = "dollars") %>% 
+  filter(`Superfunction and Function` != "In millions of dollars:")
+
+spending$dollars <- as.double(spending$dollars)
+
+estimates <- d %>% 
+  select(`Superfunction and Function`, "2020 estimate") %>%
+  rename("2020" = "2020 estimate") %>% 
+  pivot_longer(!`Superfunction and Function`, names_to = "year", 
+               values_to = "dollars") %>% 
+  filter(`Superfunction and Function` == "National Defense")
+
+nd_incomplete <- spending %>% 
+  filter(`Superfunction and Function` == "National Defense")
+
+nd <- rbind(nd_incomplete, estimates) %>% 
+  mutate(year = as.integer(year)) %>% 
+  select(year, dollars) %>% 
+  filter(year != is.na(year))
+
+treaties_nd_2 <- full_join(treaties_government, nd, by = "year")
+
+write.csv(treaties_nd_2,"treaties_data_Oct22.csv")
+
+treaties_nd_3 <- treaties_nd_2 %>% 
+  mutate(action_type = 
+           map_chr(senate_action, 
+                   ~ case_when(str_detect(., "referred to the Committee") |
+                                 str_detect(., "Committee consideration held") |
+                                 str_detect(., "Committee on Foreign") |
+                                 str_detect(., "Hearings held") ~ 
+                                 "Died in Committee",
+                               str_detect(., "approved") | 
+                                 str_detect(., "agreed to") |
+                                 str_detect(., "Approved") |
+                                 str_detect(., "Entered into force") |
+                                 str_detect(., "Passed Senate without") |
+                                 str_detect(., "ratification agreed to") |
+                                 str_detect(., "consent to ratification agreed")
+                               ~ "Ratified",
+                               str_detect(., "Returned to the President") |
+                                 str_detect(., "returned to President") |
+                                 str_detect(., "returned to the President") ~ 
+                                 "Returned to President",
+                               str_detect(., "Treaty divided") |
+                                 str_detect(., "treaty divided") ~ 
+                                 "Returned to President",
+                               str_detect(., "Approved, with reservation") ~
+                                 "Approved w/ reservation",
+                               str_detect(., "Treaty incorporated") ~
+                                 "Incorporated into another",
+                               is.na(.) ~ "Not Applicable",
+                               TRUE ~ "TBC")))
+```
+
+```{r}
+read_csv("treaties_data_Oct22.csv")
+```
+
