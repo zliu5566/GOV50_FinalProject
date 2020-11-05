@@ -248,7 +248,7 @@ congresses_1949_2020 <- c(rep(81:116, 2)) %>%
 government_1949_2020 <- years_1949_2020 %>% 
   mutate(president = presidents_1949_2020) %>%
   mutate(pres_party = case_when(president %in% c("Truman", "Kennedy",
-                                                 "Kennedy/Johnson", "Johnson",
+                                                 "Kennedy/\nJohnson", "Johnson",
                                                  "Carter", "Clinton", 
                                                  "Obama") ~ "D", 
                                 TRUE ~ "R")) %>% 
@@ -326,6 +326,15 @@ treaties_nd_3 <- treaties_nd_2 %>%
                                             to_date = 2009))
 
 write.csv(treaties_nd_3,"treaties_data_Oct29.csv")
+
+pres_factors <- c("Truman", "Eisenhower", "Kennedy", "Kennedy/\nJohnson", 
+                  "Johnson", "Nixon", "Nixon/\nFord", "Ford", "Carter", 
+                  "Reagan", "H.W. Bush", "Clinton", "W. Bush", "Obama", "Trump")
+
+treaties_nd_4 <- treaties_nd_3 %>% 
+  mutate(president = factor(president, pres_factors))
+
+write.csv(treaties_nd_4,"treaties_data_Nov3.csv")
 ```
 
 ## Graph Experimentation

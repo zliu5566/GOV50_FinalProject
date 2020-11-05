@@ -1,0 +1,65 @@
+---
+title: "Code Not Being Used"
+author: "Zelin Liu"
+date: "11/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Shiny App Code
+```{r}
+#   mutate(year = factor(year), pres_party = factor(pres_party), 
+#       congress = factor(congress), congress_party = factor(congress_party), 
+#       topic = factor(topic), senate_action = factor(senate_action)) %>% 
+
+# d %>%
+# mutate(number = map_dbl(action_type, 
+#                        ~ case_when(. == "Not Applicable" ~ 0,
+#                                    TRUE ~ 1))) %>%
+#    group_by(input$y) %>%
+#    mutate(number_2 = sum(number)) %>% 
+#    pull(number_2)
+
+#               line = geom_line(aes(y = fct_reorder(.data[[input$y]], 
+#                                                    .data[["Year"]]))),
+
+
+# columns_x <- c("President", "President Party", "Congress", "Senate Party", 
+#               "President and Senate Political Parties")
+
+# columns_y <- c("President", "Treaty Topic", "President Party", "Congress",
+#               "Senate Party", "President and Senate Political Parties")
+```
+
+```{r}
+
+
+str_replace_all(d$`Treaty Topic`,
+                               c("Dispute Settlement and Arbitration" = 
+                                     "Dispute Settlement\n and Arbitration",
+                                 "Drugs/Illegal Substances" = 
+                                     "Drugs/Illegal\n Substances",
+                                 "Extradition and Criminal Assistance" =
+                                     "Extradition and\n Criminal Assistance",
+                                 "Fisheries and Wildlife" = 
+                                     "Fisheries \n and Wildlife",
+                                 "Intellectual Property/Copyrights" = 
+                                     "Intellectual\n Property/Copyrights",
+                                 "International Law and Organization" = 
+                                     "International Law\n and Organization",
+                                 "Maritime Boundaries and Claims" = 
+                                     "Maritime Boundaries\n and Claims",
+                                 "Mutual Legal Assistance" = 
+                                     "Mutual Legal\n Assistance",
+                                 "Shipping and Marine Pollution" = 
+                                     "Shipping and\n Marine Pollution",
+                                 "Telecommunications" = 
+                                     "Tele-\ncommunications",
+                                 "Terrorism" = "Terrorism",
+                                 "Trademarks/\nPatents",
+                                 "United Nations"))
+```
+
