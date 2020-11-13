@@ -14,13 +14,15 @@ library(dplyr, warn.conflicts = FALSE)
 library(ggforce)
 library(readr)
 library(priceR)
+library(MASS)
+library(rstanarm)
 
 d <- read_csv("treaties_data_Nov3.csv") %>% 
     mutate(number = map_dbl(document, ~ case_when(is.na(.) == TRUE ~ 0,
                                               TRUE ~ 1))) %>% 
     group_by(year) %>% 
     mutate(number = sum(number)) %>% 
-    select(-title, -date, -document, -dollars) %>% 
+    dplyr::select(-title, -date, -document, -dollars) %>% 
     mutate(pres_party = str_replace(pres_party, "D", "Democratic")) %>% 
     mutate(pres_party = str_replace(pres_party, "R", "Republican")) %>% 
     mutate(congress_party = str_replace(congress_party, "D", "Democratic")) %>% 
@@ -43,7 +45,7 @@ d <- read_csv("treaties_data_Nov3.csv") %>%
                       "Extrad. and Criminal Assistance" = "Extradition",
                       "Fisheries and Wildlife" = "Fish & Wild",
                       "Human Rights" = "Hum. Rights",
-                      "Intellectual Property/Copyrights" = "I. Prop",
+                      "Intellectual Property/Copyrights" = "Intel. Prop",
                       "International Law" = "Int. Law",
                       "Int. Law and Organization" = "Int. Law",
                       "Investment" = "Invest",
@@ -54,7 +56,7 @@ d <- read_csv("treaties_data_Nov3.csv") %>%
                       "Taxation" = "Tax",
                       "Telecommunications" = "Telecom",
                       "Terrorism" = "Terror",
-                      "Trademarks/Patents" = "I. Prop",
+                      "Trademarks/Patents" = "Intel. Prop",
                       "United Nations" = "UN"))) %>% 
     mutate(congress = factor(congress)) %>% 
     mutate(pres_congress = 
@@ -76,6 +78,18 @@ d <- read_csv("treaties_data_Nov3.csv") %>%
 
 columns <- c("President", "Treaty Topic", "President Party", "Congress",
                "Senate Party", "President and Senate Political Parties")
+
+fit_2 <- stan_glm(data = d %>% 
+                      mutate(spending = 
+                                 `Nat. Defense Spending ($ in Mil.)`/10000), 
+                  `Number of Treaties in the Year` ~ 
+                      spending + `President Party` + `Senate Party`,
+                  refresh = 0,
+                  family = poisson())
+
+fit_2a <- fit_2 %>% 
+    as_tibble() %>% 
+    rename("intercept" = `(Intercept)`)
 
 # Define UI for application that draws a histogram
 ui <- navbarPage(
@@ -99,27 +113,41 @@ ui <- navbarPage(
                voting records of the U.S. Senate for every treaty that was 
                submitted to that body since 1949. I then added to that dataset
                information about presidential terms and the dominant political
-               party of the Senate for each Congress."),
+               party of the Senate for each Congress. Finally, I added to this 
+               dataset national secutiry spending data from 1949 to the present,
+               which I acquired from Whitehouse.gov. I then used the package 
+               PriceR to adjust for inflation."),
              h3("About the Author"),
-             p("My name is Z. Liu, and I study many things. 
-             You can reach me when this project is done.")),
-    tabPanel("Model",
-             titlePanel("Models and Graphics"),
-             h3("Military Spending vs. Treaties Signed: 1949-2020"),
-             fluidPage(
-                 plotOutput("plot1")
-                 ),
-             p("What we see here is that there seems to be a negative 
-               correlation between national defense spending and the number of 
-               treaties ratified by the Senate."),
-             h3("Make Your Own Graphic"),
-             p(""),
+             p("My name is Z. Liu, and I study many things.
+               You can reach me when this project is done.")),
+    tabPanel("Graphics",
+             titlePanel("Graphics"),
+             h3("Explore Features of U.S. Treaties"),
+             p("Select the values that you want to be plotted on the x and y 
+               axes respectively and the type of graph you want produced. The 
+               fill colors correspond to the actions taken by the Senate for 
+               every treaty, while the alpha reflects the number of treaties 
+               within each value on the x axis."),
              fluidPage(
                  selectInput("x", "X variable", columns),
                  selectInput("y", "Y variable", columns),
                  selectInput("geom", "geom", c("point", "column", 
                                                "jitter", "bar")),
                  plotOutput("plot2")
+                 )),
+    tabPanel("Model",
+             titlePanel("Model"),
+             h3("Military Spending vs. Treaties Signed: 1949-2020"),
+             fluidPage(
+                 plotOutput("plot1")
+             ),
+             p("What we see here is that there seems to be a negative 
+               correlation between national defense spending and the number of 
+               treaties ratified by the Senate, especially since the War on 
+               Terror and during the Reagan administration."),
+             h3("Building a Model"),
+             fluidPage(
+                 plotOutput("plot3")
                  )
              )
 )
@@ -175,6 +203,20 @@ server <- function(input, output, session) {
                   axis.text.y = element_text(size = 7.5)) +
             labs(x = input$x,
                  y = ifelse(input$geom == "bar", "Count", input$y))
+    }, res = 96)
+    
+    output$plot3 <- renderPlot({
+        ggplot(data = fit_2a, aes(spending)) +
+            geom_histogram(aes(y = after_stat(count/sum(count))),
+                           bins = 100,
+                           color = "white") +
+            theme_bw() +
+            labs(title = "Posterior Distribution for the Coefficient of 'spending'",
+                 subtitle = "'spending': annual military spending in tens of billions $",
+                 x = "Coefficient of 'spending'",
+                 y = "Probability",
+                 caption = "Used 'stan_glm' with the Poisson distribution") +
+            scale_y_continuous(labels = scales::percent_format())
     }, res = 96)
 }
 

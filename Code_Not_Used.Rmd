@@ -32,6 +32,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # columns_y <- c("President", "Treaty Topic", "President Party", "Congress",
 #               "Senate Party", "President and Senate Political Parties")
+
+# uiOutput("formula"),
+
+#     output$formula <- renderUI({
+#        withMathJax(paste0($$\text{treaty}_i = \beta_\text{intercept} + \beta_i\text{spending} + \epsilon_i$$))
+#    })
 ```
 
 ```{r}

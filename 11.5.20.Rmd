@@ -1,0 +1,61 @@
+library(rstanarm)
+library(MASS)
+
+d %>% 
+  ggplot(aes(`Number of Treaties in the Year`)) +
+  geom_density()
+
+fit <- stan_glm(data = d,
+         `Number of Treaties in the Year` ~ `Nat. Defense Spending ($ in Mil.)`,
+         refresh = 0)
+print(fit, 10)
+
+fit_2 <- stan_glm(data = d,
+                `Number of Treaties in the Year` ~ `Nat. Defense Spending ($ in Mil.)`,
+                refresh = 0,
+                family = poisson())
+print(fit_2, 10)
+
+fit_3 <- glm.nb(data = d,
+                  `Number of Treaties in the Year` ~ 
+                  `Nat. Defense Spending ($ in Mil.)`)
+summary(fit_3)
+
+read_csv("treaties_data_Nov3.csv") %>% 
+  mutate(number = map_dbl(document, ~ case_when(is.na(.) == TRUE ~ 0,
+                                                TRUE ~ 1))) %>% 
+  group_by(year) %>% 
+  mutate(number = sum(number)) %>% 
+  select(-title, -date, -document, -dollars)
+
+d %>% 
+  select(action_type)
+
+```{r}
+fit_3 <- glm.nb(data = d, `Number of Treaties in the Year` ~ 
+                  `Nat. Defense Spending ($ in Mil.)`)
+
+fit_2 <- stan_glm(data = d %>% 
+                    mutate(spending = 
+                             `Nat. Defense Spending ($ in Mil.)`/10000), 
+                  `Number of Treaties in the Year` ~ spending,
+                  refresh = 0,
+                  family = poisson())
+
+fit_2 %>% 
+  as_tibble() %>% 
+  rename("intercept" = `(Intercept)`) %>% 
+#  mutate(treaties_per_year = intercept + spending) %>% 
+  ggplot(aes(spending)) +
+  geom_histogram(aes(y = after_stat(count/sum(count))),
+                 bins = 100,
+                 color = "white") +
+  theme_bw() +
+  labs(title = "Posterior Distribution for the Coefficient of 'spending'",
+       subtitle = "'spending': annual military spending in tens of billions $",
+       x = "Coefficient of 'spending'",
+       y = "Probability",
+       caption = "Used 'stan_glm' with the Poisson distribution") +
+  scale_y_continuous(labels = scales::percent_format())
+```
+
