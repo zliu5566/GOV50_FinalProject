@@ -18,7 +18,8 @@ print(fit_2, 10)
 
 fit_3 <- glm.nb(data = d,
                   `Number of Treaties in the Year` ~ 
-                  `Nat. Defense Spending ($ in Mil.)`)
+                  `Nat. Defense Spending ($ in Mil.)` + 
+                  `President Party`*`Senate Party`)
 summary(fit_3)
 
 read_csv("treaties_data_Nov3.csv") %>% 

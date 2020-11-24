@@ -79,22 +79,37 @@ d <- read_csv("treaties_data_Nov3.csv") %>%
 columns <- c("President", "Treaty Topic", "President Party", "Congress",
                "Senate Party", "President and Senate Political Parties")
 
+party <- c("Democratic", "Republican")
+
 fit_2 <- stan_glm(data = d %>% 
                       mutate(spending = 
                                  `Nat. Defense Spending ($ in Mil.)`/10000), 
                   `Number of Treaties in the Year` ~ 
-                      spending + `President Party` + `Senate Party`,
+                      spending + `President Party`*`Senate Party`,
                   refresh = 0,
                   family = poisson())
 
 fit_2a <- fit_2 %>% 
-    as_tibble() %>% 
-    rename("intercept" = `(Intercept)`)
+    as_tibble()
+
+fit_2b <- fit_2 %>% 
+    as_tibble() %>%
+    rename("Republican President" = "`President Party`Republican") %>%
+    rename("Republican Senate" = "`Senate Party`Republican") %>%
+    rename("Interaction" = 
+               "`President Party`Republican:`Senate Party`Republican") %>% 
+    rename("Intercept" = "(Intercept)") %>% 
+    rename("Military Spending" = "spending")
+
+fit_3 <- glm.nb(data = d,
+                `Number of Treaties in the Year` ~ 
+                    `Nat. Defense Spending ($ in Mil.)` + 
+                    `President Party`*`Senate Party`)
 
 # Define UI for application that draws a histogram
 ui <- navbarPage(
     "[Project Title Signed but Pending Senate Ratification]",
-    tabPanel("About", 
+    tabPanel("Introduction", 
              titlePanel("About My Project"),
              h3("Project Overview"),
              p("Hello, this project looks at U.S. international treaties from
@@ -116,40 +131,71 @@ ui <- navbarPage(
                party of the Senate for each Congress. Finally, I added to this 
                dataset national secutiry spending data from 1949 to the present,
                which I acquired from Whitehouse.gov. I then used the package 
-               PriceR to adjust for inflation."),
-             h3("About the Author"),
-             p("My name is Z. Liu, and I study many things.
-               You can reach me when this project is done.")),
+               PriceR to adjust for inflation.")),
     tabPanel("Graphics",
-             titlePanel("Graphics"),
+             titlePanel("Visualizing Data"),
+             h3("Military Spending vs. Treaties Signed: 1949-2020"),
+             fluidPage(
+                 plotOutput("plot1")
+             ),
+             h3("Correlation Between Spending and Treaties"),
+             fluidPage(
+                 plotOutput("plot4")
+             ),
              h3("Explore Features of U.S. Treaties"),
              p("Select the values that you want to be plotted on the x and y 
                axes respectively and the type of graph you want produced. The 
                fill colors correspond to the actions taken by the Senate for 
                every treaty, while the alpha reflects the number of treaties 
                within each value on the x axis."),
-             fluidPage(
+             sidebarPanel(fluidPage(
                  selectInput("x", "X variable", columns),
                  selectInput("y", "Y variable", columns),
                  selectInput("geom", "geom", c("point", "column", 
-                                               "jitter", "bar")),
+                                               "jitter", "bar")))
+                 ),
+             fluidPage(
                  plotOutput("plot2")
-                 )),
+                 )
+             ),
     tabPanel("Model",
              titlePanel("Model"),
-             h3("Military Spending vs. Treaties Signed: 1949-2020"),
+             p("The model formula would likely look like this:"),
              fluidPage(
-                 plotOutput("plot1")
+                 withMathJax(),
+                 helpText("$$\\text{Treaty Number}_i = \\beta_0 +
+                 \\beta_1\\cdot\\text{Military Spending}_i + 
+                 \\beta_2\\cdot\\text{Rep. Pres.}_i + 
+                 \\beta_3\\cdot\\text{Rep. Sen.}_i +
+                 \\beta_4\\cdot\\text{Rep. Pres.}_i\\cdot\\text{Rep. Sen.}_i +
+                          \\epsilon_i$$")
              ),
-             p("What we see here is that there seems to be a negative 
-               correlation between national defense spending and the number of 
-               treaties ratified by the Senate, especially since the War on 
-               Terror and during the Reagan administration."),
-             h3("Building a Model"),
+             h3("Model Coefficient Posteriors"),
+             p("Select the model variable to see the posterior distribution of 
+               its coefficient"),
+             fluidPage(
+                 selectInput("v", "Variables", names(fit_2b))
+                 ),
              fluidPage(
                  plotOutput("plot3")
+                 ),
+             h3("Using the Model"),
+             p("Select the party of the President, the majority party of the 
+               Senate, and the military spending in tens of billions of dollars
+               to see my model's predictions for the number of treaties to be
+               signed in such a year."),
+             fluidPage(
+                 selectInput("a", "President Party", party),
+                 selectInput("b", "Senate Party", party),
+                 sliderInput("c", "Military Spending in Tens of Billions $",
+                             min = 0, max = 100, value = 50, round = FALSE),
+                 plotOutput("plot5")
                  )
-             )
+             ),
+    tabPanel("About",
+             titlePanel("About the Author"),
+             p("My name is Z. Liu, and I study many things.
+               You can reach me when this project is done."))
 )
 
 # Define server logic required to draw a histogram
@@ -177,7 +223,8 @@ server <- function(input, output, session) {
     output$plot1 <- renderPlot({
         ggplot(d, aes(x = d$Year)) +
             geom_col(aes(y = d$"Number of Treaties in the Year"),
-                     color = "white", fill = "dodgerblue", position = "dodge") +
+                     color = "white", fill = "deepskyblue3", 
+                     position = "dodge") +
             geom_line(aes(y = d$"Nat. Defense Spending ($ in Mil.)"/20000),
                       color = "red", size = 1.5) +
             scale_y_continuous(
@@ -206,17 +253,67 @@ server <- function(input, output, session) {
     }, res = 96)
     
     output$plot3 <- renderPlot({
-        ggplot(data = fit_2a, aes(spending)) +
+        ggplot(data = fit_2b, aes(.data[[input$v]])) +
             geom_histogram(aes(y = after_stat(count/sum(count))),
                            bins = 100,
-                           color = "white") +
+                           color = "white",
+                           fill = "darkorange2") +
             theme_bw() +
-            labs(title = "Posterior Distribution for the Coefficient of 'spending'",
-                 subtitle = "'spending': annual military spending in tens of billions $",
-                 x = "Coefficient of 'spending'",
+            labs(title = paste("Posterior Distribution of the Coefficient of",
+                               input$v),
+                 subtitle = paste(
+                     case_when(input$v == "Military Spending" ~ 
+                                   "Military Spending: in tens of billions $",
+                               input$v == "Intercept" ~
+                                   "Intercept: Dem. President and Dem. Senate",
+                               input$v == "Republican President" ~ 
+                                   "Republican President (no interaction)",
+                               input$v == "Republican Senate" ~ 
+                                   "Republican Senate (no interaction)",
+                               TRUE ~ 
+                                   "Interaction: GOP President and GOP Senate")
+                     ),
+                 x = paste("Coefficient of", input$v),
                  y = "Probability",
-                 caption = "Used 'stan_glm' with the Poisson distribution") +
+                 caption = "Used 'stan_glm' with the Poisson distribution.") +
             scale_y_continuous(labels = scales::percent_format())
+    }, res = 96)
+    
+    output$plot4 <- renderPlot({
+        ggplot(data = d, aes(d$`Nat. Defense Spending ($ in Mil.)`/10000, 
+                             d$`Number of Treaties in the Year`)) +
+            geom_point() +
+            geom_smooth(color = "red", alpha = 0.2) +
+            theme_bw() +
+            labs(x = "Military Spending in Tens of Billions $",
+                 y = "Number of Treaties Signed that Year")
+    }, res = 96)
+    
+    output$plot5 <- renderPlot({
+        new_obs <- tibble(`President Party` = input$a,
+                          `Senate Party` = input$b,
+                          spending = input$c)
+        
+        pp <- posterior_predict(fit_2, newdata = new_obs) %>% 
+            as_tibble() %>% 
+            mutate_all(as.numeric)
+        
+        pp %>% 
+            ggplot(aes(`1`)) +
+            geom_histogram(aes(y = after_stat(count/sum(count))),
+                           binwidth = 1,
+                           color = "white",
+                           fill = "forestgreen") +
+            theme_bw() +
+            labs(title = "Posterior Probability Distributions",
+                 subtitle = paste("For a", input$a, "presidency,", 
+                                  "a", input$b, "Senate, and at $", 
+                                  input$c*10, "billion"),
+                 x = "Number of Treaties Signed",
+                 y = "Probability") +
+            coord_cartesian(xlim = c(0, 100), ylim = c(0, 0.2)) +
+            scale_y_continuous(labels = scales::percent_format()) +
+            scale_x_continuous(breaks = seq(0, 100, by = 10))
     }, res = 96)
 }
 

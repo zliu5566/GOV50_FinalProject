@@ -16,3 +16,5 @@ print(fit_2, 10)
                       spending + `President Party`*`Senate Party` + `President`,
                     refresh = 0,
                     family = poisson())
+
+print(fit_2b, 10)
