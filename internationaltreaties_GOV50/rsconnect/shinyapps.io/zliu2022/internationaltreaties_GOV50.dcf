@@ -5,8 +5,8 @@ account: zliu2022
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 3033777
-bundleId: 3828852
+bundleId: 3941474
 url: https://zliu2022.shinyapps.io/internationaltreaties_GOV50/
-when: 1604686329.91584
+when: 1607056422.36219
 asMultiple: FALSE
 asStatic: FALSE

@@ -68,3 +68,53 @@ output$selected_var1 <- renderText({
 output$selected_var2 <- renderText({
   paste("Coefficient of", input$v)
 })
+
+fit_3 %>% 
+  tbl_regression() %>% 
+  as_gt() %>% 
+  tab_header("Regression of Treaty Numbers: Negative Binomial") %>% 
+  tab_source_note(md("Source: Congress.gov and WhiteHouse.gov"))
+
+
+tabPanel("Using the Model",
+         h3("Predicting Treaty Numbers"),
+         sidebarPanel(fluidPage(
+           p("Set the following values to see my model's 
+                              predictions for the number of treaties to be 
+                                signed in such a year."),
+           selectInput("a", "President Party", party),
+           selectInput("b", "Senate Party", party),
+           sliderInput("c", "Military Spending in Tens of 
+                                          Billions $",
+                       min = 0, max = 100, value = 50, 
+                       round = FALSE)
+         ),
+         width = 4),
+         mainPanel(fluidPage(
+           plotOutput("plot5")
+         ),
+         width = 8))
+
+fluidPage(
+  splitLayout(
+    cellWidths = c("50%", "50%"),
+    plotOutput("plot6"),
+    plotOutput("plot7")
+  )
+)
+
+sidebarPanel(
+  h4("Posterior Predictive Check: Mean"),
+  fluidPage(
+    plotOutput("plot6")
+  ),
+  width = 6
+)
+
+mainPanel(
+  h4("Posterior Predictive Check: Distribution"),
+  fluidPage(
+    plotOutput("plot7")
+  ),
+  width = 6
+)

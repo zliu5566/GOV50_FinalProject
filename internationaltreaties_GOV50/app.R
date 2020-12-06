@@ -16,6 +16,10 @@ library(readr)
 library(priceR)
 library(MASS)
 library(rstanarm)
+library(shinythemes)
+library(gtsummary)
+library(gt)
+library(broom.mixed)
 
 d <- read_csv("treaties_data_Nov3.csv") %>% 
     mutate(number = map_dbl(document, ~ case_when(is.na(.) == TRUE ~ 0,
@@ -81,38 +85,94 @@ columns <- c("President", "Treaty Topic", "President Party", "Congress",
 
 party <- c("Democratic", "Republican")
 
-fit_2 <- stan_glm(data = d %>% 
-                      mutate(spending = 
-                                 `Nat. Defense Spending ($ in Mil.)`/10000), 
-                  `Number of Treaties in the Year` ~ 
-                      spending + `President Party`*`Senate Party`,
-                  refresh = 0,
-                  family = poisson())
+president_term <- tibble(start = c(1949, 1953, 1961, 1969, 1977, 1981, 1993,
+                                   2001, 2009, 2017),
+                         end = c(1953, 1961, 1969, 1977, 1981, 1993, 2001,
+                                 2009, 2017, 2020),
+                         base = rep(0, 10),
+                         height = rep(40, 10),
+                         party = c("D", "R", "D", "R", "D", "R", "D", "R", "D", 
+                                   "R"))
 
-fit_2a <- fit_2 %>% 
+d2 <- d %>% 
+    mutate("Military Spending" = `Nat. Defense Spending ($ in Mil.)`/10000) %>%
+    group_by(Year, `President Party`, `Senate Party`, `Military Spending`, 
+             `Number of Treaties in the Year`, President) %>% 
+    summarize("Number of Treaties" = mean(`Number of Treaties in the Year`),
+              .groups = "drop") %>% 
+    select(-`Number of Treaties in the Year`)
+
+fit_1 <- stan_glm(data = d2, 
+                  `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party`,
+                  refresh = 0,
+                  family = neg_binomial_2())
+
+fit_1a <- fit_1 %>% 
     as_tibble()
 
-fit_2b <- fit_2 %>% 
+fit_1b <- fit_1 %>% 
     as_tibble() %>%
     rename("Republican President" = "`President Party`Republican") %>%
     rename("Republican Senate" = "`Senate Party`Republican") %>%
     rename("Interaction" = 
                "`President Party`Republican:`Senate Party`Republican") %>% 
     rename("Intercept" = "(Intercept)") %>% 
-    rename("Military Spending" = "spending")
+    rename("Military Spending" = "`Military Spending`")
 
-fit_3 <- glm.nb(data = d,
-                `Number of Treaties in the Year` ~ 
-                    `Nat. Defense Spending ($ in Mil.)` + 
-                    `President Party`*`Senate Party`)
+fit_2 <- stan_glm(data = d2, 
+                  `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party`,
+                  refresh = 0,
+                  family = gaussian())
+
+fit_3 <- stan_glm(data = d2, 
+                  `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party`,
+                  refresh = 0,
+                  family = poisson())
+
+fit_4 <- stan_glm(data = d2, 
+                  `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party` +
+                      President,
+                  refresh = 0,
+                  family = neg_binomial_2())
+
+fit_5 <- glm.nb(data = d2,
+                `Number of Treaties` ~ 
+                    `Military Spending` + `President Party`*`Senate Party`)
+
+fit_6 <- glm.nb(data = d2,
+                `Number of Treaties` ~ 
+                    `Military Spending` + `President Party`*`Senate Party` +
+                    President)
 
 # Define UI for application that draws a histogram
 ui <- navbarPage(
-    "[Project Title Signed but Pending Senate Ratification]",
-    tabPanel("Introduction", 
-             titlePanel("About My Project"),
+    theme = shinytheme("lumen"),
+    title = paste("Elephants, Donkeys, Doves, and Hawks:
+                  Predicting U.S. Treaties"),
+    tabPanel("Predicting Treaties", 
+             titlePanel("Predicting U.S. International Treaties"),
+             sidebarPanel(
+                 fluidPage(
+                   p("Set the following values to predict the number of treaties
+                     that will be signed in such a year."),
+                   selectInput("a", "President Party", party),
+                   selectInput("b", "Senate Party", party),
+                   sliderInput("c", "Military Spending in Tens of Billions $",
+                               min = 0, max = 100, value = 50, 
+                               round = FALSE)
+                   ),
+                 width = 4),
+             mainPanel(
+                 fluidPage(
+                     plotOutput("plot5")
+                     ),
+                 width = 8),
              h3("Project Overview"),
-             p("Hello, this project looks at U.S. international treaties from
+             p("This project looks at U.S. international treaties from
                1949 to 2020. Specifically, it examines the realtionship between
                the U.S. Senate's willingness to pass a treaty and such factors 
                as the sitting U.S. President, the dominant party in the Senate,
@@ -123,44 +183,37 @@ ui <- navbarPage(
                purposes. I have always been fascinated by U.S. foreign policy, 
                and international treaties seem to be one of the most 
                prominent ways in which foreign policy is enacted."),
-             h3("Data Collection"),
-             p("I collected this data by scraping Congress.gov, which has the 
-               voting records of the U.S. Senate for every treaty that was 
-               submitted to that body since 1949. I then added to that dataset
-               information about presidential terms and the dominant political
-               party of the Senate for each Congress. Finally, I added to this 
-               dataset national secutiry spending data from 1949 to the present,
-               which I acquired from Whitehouse.gov. I then used the package 
-               PriceR to adjust for inflation.")),
+             ),
     tabPanel("Graphics",
-             titlePanel("Visualizing Data"),
-             h3("Military Spending vs. Treaties Signed: 1949-2020"),
-             fluidPage(
-                 plotOutput("plot1")
-             ),
-             h3("Correlation Between Spending and Treaties"),
-             fluidPage(
-                 plotOutput("plot4")
-             ),
-             h3("Explore Features of U.S. Treaties"),
-             p("Select the values that you want to be plotted on the x and y 
-               axes respectively and the type of graph you want produced. The 
-               fill colors correspond to the actions taken by the Senate for 
-               every treaty, while the alpha reflects the number of treaties 
-               within each value on the x axis."),
-             sidebarPanel(fluidPage(
-                 selectInput("x", "X variable", columns),
-                 selectInput("y", "Y variable", columns),
-                 selectInput("geom", "geom", c("point", "column", 
-                                               "jitter", "bar")))
-                 ),
-             fluidPage(
-                 plotOutput("plot2")
-                 )
+             tabsetPanel(
+                 tabPanel("Visualizing the Data",
+                          titlePanel("Visualizing Data Correlations"),
+                          h3("Military Spending vs. Treaties Signed: 
+                             1949-2020"),
+                          fluidPage(
+                              plotOutput("plot1")
+                              ),
+                          h3("Correlation Between Spending and Treaties"),
+                          fluidPage(
+                              plotOutput("plot4")
+                              )),
+                 tabPanel("Exploring the Data", 
+                          titlePanel("Pick Your Own Data Visualization"),
+                          sidebarPanel(fluidPage(
+                              selectInput("x", "X variable", columns),
+                              selectInput("y", "Y variable", columns),
+                              selectInput("geom", "geom", c("point", "column", 
+                                                            "jitter", "bar"))),
+                              width = 3
+                              ),
+                          mainPanel(fluidPage(
+                              plotOutput("plot2")
+                              ),
+                              width = 9)
+                 ))
              ),
     tabPanel("Model",
              titlePanel("Model"),
-             p("The model formula would likely look like this:"),
              fluidPage(
                  withMathJax(),
                  helpText("$$\\text{Treaty Number}_i = \\beta_0 +
@@ -169,31 +222,143 @@ ui <- navbarPage(
                  \\beta_3\\cdot\\text{Rep. Sen.}_i +
                  \\beta_4\\cdot\\text{Rep. Pres.}_i\\cdot\\text{Rep. Sen.}_i +
                           \\epsilon_i$$")
-             ),
-             h3("Model Coefficient Posteriors"),
-             p("Select the model variable to see the posterior distribution of 
-               its coefficient"),
-             fluidPage(
-                 selectInput("v", "Variables", names(fit_2b))
                  ),
-             fluidPage(
-                 plotOutput("plot3")
+             p(" "),
+             tabsetPanel(
+                 tabPanel("Building the Model",
+                          h3("Creating a Linear Model"),
+                          p("The formula upon which I settled for this model 
+                            includes: an intercept, military spending (in tens 
+                            of billions of dollars, since the military spends 
+                            too much to calculate the impact of individual 
+                            dollars being spent), the party of the president, 
+                            the party of the Senate majority, and an interaction
+                            variable to account for the effects of having a 
+                            president and a Senate majority being of the same 
+                            party."),
+                          h3("Model Coefficient Posteriors"),
+                          sidebarPanel(fluidPage(
+                              p("Select a variable within the model to see the 
+                                posterior distribution of its coefficient"),
+                              selectInput("v", "Variables", names(fit_1b))
+                              ),
+                          width = 4),
+                          mainPanel(fluidPage(
+                              plotOutput("plot3")
+                              ),
+                              width = 8)),
+                 tabPanel("Explaining the Model",
+                          h3("Interpreting the Numbers"),
+                          p("The regression table of the model I built can be 
+                            seen below:"),
+                          fluidPage(
+                              gt_output("table1")
+                              ),
+                          p("What we see here is that [Interpretation]")
+                          ),
+                 tabPanel("Selecting a Distribution",
+                          h3("Negative Binomial"),
+                          splitLayout(
+                              cellWidths = c("55%", "45%"),
+                              h4("Posterior Predictive Check: Mean"),
+                              h4("Posterior Predictive Check: Distribution")
+                              ),
+                          fluidPage(
+                              splitLayout(
+                                  cellWidths = c("55%", "45%"),
+                                  plotOutput("plot6"),
+                                  plotOutput("plot7")
+                                  )
+                              ),
+                          p("[Benefits of and problems with]"),
+                          h3("Gaussian"),
+                          splitLayout(
+                              cellWidths = c("55%", "45%"),
+                              h4("Posterior Predictive Check: Mean"),
+                              h4("Posterior Predictive Check: Distribution")
+                              ),
+                          fluidPage(
+                              splitLayout(
+                                  cellWidths = c("55%", "45%"),
+                                  plotOutput("plot8"),
+                                  plotOutput("plot9")
+                                  )
+                              ),
+                          p("[Benefits of and problems with]"),
+                          h3("Poisson"),
+                          splitLayout(
+                              cellWidths = c("55%", "45%"),
+                              h4("Posterior Predictive Check: Mean"),
+                              h4("Posterior Predictive Check: Distribution")
+                              ),
+                          fluidPage(
+                              splitLayout(
+                                  cellWidths = c("55%", "45%"),
+                                  plotOutput("plot10"),
+                                  plotOutput("plot11")
+                                  )
+                              ),
+                          p("[Benefits of and problems with]")
+                          ),
+                 tabPanel("An Alternative Model",
+                          h3("Dummy Variable"),
+                          p("No model, of course, is perfect. Hence, in addition 
+                            to producing a model that takes into account 
+                            military spending and political party, I created a 
+                            second model that contains a dummy variable to 
+                            account for the uniqueness of each president within 
+                            the timespan of my data. The regression table of the 
+                            new model can be seen below:"),
+                          fluidPage(
+                              gt_output("table2")
+                              ),
+                          p("[Explanation of what this model means]"),
+                          splitLayout(
+                              cellWidths = c("55%", "45%"),
+                              h4("Posterior Predictive Check: Mean"),
+                              h4("Posterior Predictive Check: Distribution")
+                              ),
+                          fluidPage(
+                              splitLayout(
+                                  cellWidths = c("55%", "45%"),
+                                  plotOutput("plot12"),
+                                  plotOutput("plot13")
+                                  )
+                              ),
+                          p("[Explanation of what this means for fit]")
+                          ),
+                 tabPanel("A Non-Bayesian Approach",
+                          h3("Using glm.nb"),
+                          p("For the sake of thoroughness, I also decided to 
+                            create a non-Bayesian model for my data using the 
+                            glm.nb function, the regression table of which is 
+                            below:"),
+                          fluidPage(
+                              gt_output("table3")
+                              ),
+                          p("[Explanation of what this model means]"),
+                          h3("Dummy Variable (Part II)"),
+                          p("Here is the glm.nb model with the president dummy
+                            variable:"),
+                          fluidPage(
+                              gt_output("table4")
+                              ),
+                          p("[Explanation of what this model means]")
+                          )
                  ),
-             h3("Using the Model"),
-             p("Select the party of the President, the majority party of the 
-               Senate, and the military spending in tens of billions of dollars
-               to see my model's predictions for the number of treaties to be
-               signed in such a year."),
-             fluidPage(
-                 selectInput("a", "President Party", party),
-                 selectInput("b", "Senate Party", party),
-                 sliderInput("c", "Military Spending in Tens of Billions $",
-                             min = 0, max = 100, value = 50, round = FALSE),
-                 plotOutput("plot5")
-                 )
              ),
     tabPanel("About",
-             titlePanel("About the Author"),
+             titlePanel("About this Project"),
+             h3("Data Collection"),
+             p("I collected this data by scraping Congress.gov, which has the 
+               voting records of the U.S. Senate for every treaty that was 
+               submitted to that body since 1949. I then added to that dataset
+               information about presidential terms and the dominant political
+               party of the Senate for each Congress. Finally, I added to this 
+               dataset national security spending data from 1949 to the present,
+               which I acquired from Whitehouse.gov. I then used the package 
+               PriceR to adjust for inflation."),
+             h3("About the Author"),
              p("My name is Z. Liu, and I study many things.
                You can reach me when this project is done."))
 )
@@ -221,11 +386,22 @@ server <- function(input, output, session) {
     })
 
     output$plot1 <- renderPlot({
-        ggplot(d, aes(x = d$Year)) +
-            geom_col(aes(y = d$"Number of Treaties in the Year"),
-                     color = "white", fill = "deepskyblue3", 
+        ggplot() +
+            geom_rect(data = president_term,
+                      aes(xmin = start,
+                          xmax = end,
+                          ymin = base,
+                          ymax = height,
+                          fill = party),
+                      alpha = 0.1) +
+            geom_col(data = d,
+                     aes(x = d$Year,
+                         y = d$"Number of Treaties in the Year"),
+                     color = "white", fill = "goldenrod3", 
                      position = "dodge") +
-            geom_line(aes(y = d$"Nat. Defense Spending ($ in Mil.)"/20000),
+            geom_line(data = d,
+                      aes(x = d$Year,
+                          y = d$"Nat. Defense Spending ($ in Mil.)"/20000),
                       color = "red", size = 1.5) +
             scale_y_continuous(
                 name = "Number of Treaties per Year",
@@ -233,6 +409,9 @@ server <- function(input, output, session) {
                     sec_axis(trans = ~ . * 20, 
                              name = "Billions of $ (adjusted to 2009 $)")
                 ) +
+            scale_fill_manual(name = "President Party",
+                              labels = c("Democratic", "Red"),
+                              values = c("blue", "red")) +
             theme_bw() +
             labs(x = "Year")
     }, res = 96)
@@ -253,11 +432,18 @@ server <- function(input, output, session) {
     }, res = 96)
     
     output$plot3 <- renderPlot({
-        ggplot(data = fit_2b, aes(.data[[input$v]])) +
+        ggplot(data = fit_1b, aes(.data[[input$v]])) +
             geom_histogram(aes(y = after_stat(count/sum(count))),
                            bins = 100,
                            color = "white",
-                           fill = "darkorange2") +
+                           fill = "darkgoldenrod2") +
+            geom_vline(xintercept = median(fit_1b[[input$v]]), color = "red") +
+            geom_vline(xintercept = 
+                           median(fit_1b[[input$v]]) + sd(fit_1b[[input$v]])*2,
+                       lty = "dashed") +
+            geom_vline(xintercept = 
+                           median(fit_1b[[input$v]]) - sd(fit_1b[[input$v]])*2,
+                       lty = "dashed") +
             theme_bw() +
             labs(title = paste("Posterior Distribution of the Coefficient of",
                                input$v),
@@ -275,7 +461,7 @@ server <- function(input, output, session) {
                      ),
                  x = paste("Coefficient of", input$v),
                  y = "Probability",
-                 caption = "Used 'stan_glm' with the Poisson distribution.") +
+                 caption = "Used the 'stan_glm' function.") +
             scale_y_continuous(labels = scales::percent_format())
     }, res = 96)
     
@@ -283,7 +469,8 @@ server <- function(input, output, session) {
         ggplot(data = d, aes(d$`Nat. Defense Spending ($ in Mil.)`/10000, 
                              d$`Number of Treaties in the Year`)) +
             geom_point() +
-            geom_smooth(color = "red", alpha = 0.2) +
+            geom_smooth(color = "red", alpha = 0.2, 
+                        method = "loess", formula = "y ~ x") +
             theme_bw() +
             labs(x = "Military Spending in Tens of Billions $",
                  y = "Number of Treaties Signed that Year")
@@ -292,9 +479,9 @@ server <- function(input, output, session) {
     output$plot5 <- renderPlot({
         new_obs <- tibble(`President Party` = input$a,
                           `Senate Party` = input$b,
-                          spending = input$c)
+                          `Military Spending` = input$c)
         
-        pp <- posterior_predict(fit_2, newdata = new_obs) %>% 
+        pp <- posterior_predict(fit_1, newdata = new_obs) %>% 
             as_tibble() %>% 
             mutate_all(as.numeric)
         
@@ -303,7 +490,12 @@ server <- function(input, output, session) {
             geom_histogram(aes(y = after_stat(count/sum(count))),
                            binwidth = 1,
                            color = "white",
-                           fill = "forestgreen") +
+                           fill = "palegreen3") +
+            geom_vline(xintercept = mean(pp$`1`), color = "red") +
+            geom_vline(xintercept = mean(pp$`1`) + sd(pp$`1`)*2, 
+                       lty = "dashed") +
+            geom_vline(xintercept = mean(pp$`1`) - sd(pp$`1`)*2, 
+                       lty = "dashed") +
             theme_bw() +
             labs(title = "Posterior Probability Distributions",
                  subtitle = paste("For a", input$a, "presidency,", 
@@ -313,8 +505,86 @@ server <- function(input, output, session) {
                  y = "Probability") +
             coord_cartesian(xlim = c(0, 100), ylim = c(0, 0.2)) +
             scale_y_continuous(labels = scales::percent_format()) +
-            scale_x_continuous(breaks = seq(0, 100, by = 10))
+            scale_x_continuous(breaks = seq(0, 100, by = 5))
     }, res = 96)
+    
+    output$plot6 <- renderPlot({
+        pp_check(fit_1, plotfun = "stat", stat = "mean", binwidth = 0.1)
+    })
+    
+    output$plot7 <- renderPlot({
+        pp_check(fit_1, plotfun = "dens_overlay")
+    })
+    
+    output$plot8 <- renderPlot({
+        pp_check(fit_2, plotfun = "stat", stat = "mean", binwidth = 0.1)
+    })
+    
+    output$plot9 <- renderPlot({
+        pp_check(fit_2, plotfun = "dens_overlay")
+    })
+    
+    output$plot10 <- renderPlot({
+        pp_check(fit_3, plotfun = "stat", stat = "mean", binwidth = 0.1)
+    })
+    
+    output$plot11 <- renderPlot({
+        pp_check(fit_3, plotfun = "dens_overlay")
+    })
+    
+    output$plot12 <- renderPlot({
+        pp_check(fit_4, plotfun = "stat", stat = "mean", binwidth = 0.1)
+    })
+    
+    output$plot13 <- renderPlot({
+        pp_check(fit_4, plotfun = "dens_overlay")
+    })
+    
+    output$table1 <- render_gt(
+        fit_1 %>% 
+            tbl_regression() %>%
+            as_gt() %>%
+            tab_header(title = "Regression of Treaties Number (Negative Binomial)",
+                       subtitle = "The impact of party and military spending 
+                       1949-2020") %>%
+            tab_source_note(md("Source: Congress.gov and WhiteHouse.gov")) %>% 
+            tab_source_note(md("Distribution: Poisson"))
+        )
+    
+    output$table2 <- render_gt(
+        fit_4 %>% 
+            tbl_regression() %>% 
+            as_gt() %>% 
+            tab_header(title = "Regression of Treaty Numbers: Presidents",
+                       subtitle = "The impact of presidential uniqueness
+                       alongside party and military spending") %>% 
+            tab_source_note(md("Source: Congress.gov and WhiteHouse.gov")) %>% 
+            tab_source_note(md("Distribution: Negative Binomial"))
+        )
+    
+    output$table3 <- render_gt(
+        fit_5 %>% 
+            tbl_regression() %>% 
+            as_gt() %>% 
+            tab_header(title = "Treaties Number Regression: glm.nb",
+                       subtitle = "The impact of the President's party, the 
+                       Senate's party, and military spending, non-Bayesian
+                       edition") %>% 
+            tab_source_note(md("Source: Congress.gov and WhiteHouse.gov")) %>% 
+            tab_source_note(md("Distribution: Negative Binomial"))
+        )
+    
+    output$table4 <- render_gt(
+        fit_6 %>% 
+            tbl_regression() %>% 
+            as_gt() %>% 
+            tab_header(title = "President Dummy Regression: glm.nb",
+                       subtitle = "The impact of presidential uniqueness
+                       alongside party and military spending, non-Bayesian
+                       edition") %>% 
+            tab_source_note(md("Source: Congress.gov and WhiteHouse.gov")) %>% 
+            tab_source_note(md("Distribution: Negative Binomial"))
+        )
 }
 
 # Run the application 

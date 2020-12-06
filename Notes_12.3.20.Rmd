@@ -1,0 +1,296 @@
+---
+title: 'Notes: 12.3.20'
+author: "Zelin Liu"
+date: "12/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidymodels)
+library(tidyverse)
+library(ggplot2)
+library(dplyr, warn.conflicts = FALSE)
+library(ggforce)
+library(readr)
+library(priceR)
+library(MASS)
+library(rstanarm)
+library(shinythemes)
+library(gtsummary)
+library(gt)
+library(broom.mixed)
+```
+
+## Datasets
+```{r}
+d2_test <- d %>% 
+  mutate("Military Spending" = `Nat. Defense Spending ($ in Mil.)`/10000) %>%
+  group_by(Year, `President Party`, `Senate Party`, `Military Spending`, 
+           `Number of Treaties in the Year`, President) %>% 
+  summarize("Number of Treaties" = mean(`Number of Treaties in the Year`),
+            .groups = "drop") %>% 
+  select(-`Number of Treaties in the Year`) %>% 
+  mutate(number = `Number of Treaties` + 0.5) %>% 
+  mutate(number_log = log(number))
+```
+
+## Stan GLM Models
+```{r}
+fit_2a <- stan_glm(data = d2_test, 
+                    `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party` +
+                      President,
+                    refresh = 0,
+                    family = poisson())
+
+fit_2b <- stan_glm(data = d2_test, 
+                    `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party` +
+                      President,
+                    refresh = 0,
+                    family = neg_binomial_2())
+
+fit_2c <- stan_glm(data = d2_test, 
+                    `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party`,
+                    refresh = 0,
+                    family = poisson())
+
+fit_2d <- stan_glm(data = d2_test, 
+                    `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party`,
+                    refresh = 0,
+                    family = neg_binomial_2())
+
+fit_2e <- stan_glm(data = d2_test, 
+                    `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party`,
+                    refresh = 0,
+                    family = gaussian())
+
+fit_2f <- stan_glm(data = d2_test, 
+                    `Number of Treaties` ~ 
+                      `Military Spending` + `President Party`*`Senate Party`,
+                    refresh = 0,
+                    family = gaussian())
+```
+
+## Stan GLM RMSE
+```{r}
+fitted_fit_2a <- predict(fit_2a) %>% 
+  as_tibble() %>% 
+  rename("fitted" = value) %>% 
+  pull(fitted)
+
+fitted_fit_2b <- predict(fit_2b) %>% 
+  as_tibble() %>% 
+  rename("fitted" = value) %>% 
+  pull(fitted)
+
+fitted_fit_2c <- predict(fit_2c) %>% 
+  as_tibble() %>% 
+  rename("fitted" = value) %>% 
+  pull(fitted)
+
+fitted_fit_2d <- predict(fit_2d) %>% 
+  as_tibble() %>% 
+  rename("fitted" = value) %>% 
+  pull(fitted)
+
+fitted_fit_2e <- predict(fit_2e) %>% 
+  as_tibble() %>% 
+  rename("fitted" = value) %>% 
+  pull(fitted)
+
+fitted_fit_2f <- predict(fit_2f) %>% 
+  as_tibble() %>% 
+  rename("fitted" = value) %>% 
+  pull(fitted)
+
+d2_test %>% 
+  ungroup() %>% 
+  mutate(fitted = fitted_fit_2a) %>% 
+  rename(number = `Number of Treaties`) %>% 
+  select(number, fitted) %>% 
+  mutate(residuals = number - fitted) %>% 
+  mutate(squares = residuals^2) %>% 
+  summarize(mean = mean(squares)) %>% 
+  summarize(RMSE = sqrt(mean))
+
+d2_test %>% 
+  ungroup() %>% 
+  mutate(fitted = fitted_fit_2b) %>% 
+  rename(number = `Number of Treaties`) %>% 
+  select(number, fitted) %>% 
+  mutate(residuals = number - fitted) %>% 
+  mutate(squares = residuals^2) %>% 
+  summarize(mean = mean(squares)) %>% 
+  summarize(RMSE = sqrt(mean))
+
+d2_test %>% 
+  ungroup() %>% 
+  mutate(fitted = fitted_fit_2c) %>% 
+  rename(number = `Number of Treaties`) %>% 
+  select(number, fitted) %>% 
+  mutate(residuals = number - fitted) %>% 
+  mutate(squares = residuals^2) %>% 
+  summarize(mean = mean(squares)) %>% 
+  summarize(RMSE = sqrt(mean))
+
+d2_test %>% 
+  ungroup() %>% 
+  mutate(fitted = fitted_fit_2d) %>% 
+  rename(number = `Number of Treaties`) %>% 
+  select(number, fitted) %>% 
+  mutate(residuals = number - fitted) %>% 
+  mutate(squares = residuals^2) %>% 
+  summarize(mean = mean(squares)) %>% 
+  summarize(RMSE = sqrt(mean))
+
+d2_test %>% 
+  ungroup() %>% 
+  mutate(fitted = fitted_fit_2e) %>% 
+  rename(number = `Number of Treaties`) %>% 
+  select(number, fitted) %>% 
+  mutate(residuals = number - fitted) %>% 
+  mutate(squares = residuals^2) %>% 
+  summarize(mean = mean(squares)) %>% 
+  summarize(RMSE = sqrt(mean))
+
+d2_test %>% 
+  ungroup() %>% 
+  mutate(fitted = fitted_fit_2f) %>% 
+  rename(number = `Number of Treaties`) %>% 
+  select(number, fitted) %>% 
+  mutate(residuals = number - fitted) %>% 
+  mutate(squares = residuals^2) %>% 
+  summarize(mean = mean(squares)) %>% 
+  summarize(RMSE = sqrt(mean))
+```
+
+## Stan GLM PP Check
+```{r}
+pp_check(fit_2a, plotfun = "stat", stat = "mean", binwidth = 0.1)
+pp_check(fit_2a, plotfun = "dens_overlay")
+
+pp_check(fit_2b, plotfun = "stat", stat = "mean", binwidth = 0.1)
+pp_check(fit_2b, plotfun = "dens_overlay")
+
+pp_check(fit_2c, plotfun = "stat", stat = "mean", binwidth = 0.1)
+pp_check(fit_2c, plotfun = "dens_overlay")
+
+pp_check(fit_2d, plotfun = "stat", stat = "mean")
+pp_check(fit_2d, plotfun = "dens_overlay")
+
+pp_check(fit_2e, plotfun = "stat", stat = "mean")
+pp_check(fit_2e, plotfun = "dens_overlay")
+
+pp_check(fit_2f, plotfun = "stat", stat = "mean", binwidth = 0.5)
+pp_check(fit_2f, plotfun = "dens_overlay")
+```
+
+## Negative Binomial
+```{r}
+fit_3a <- glm.nb(data = d2_test,
+                  `Number of Treaties` ~ 
+                    `Military Spending` + `President Party`*`Senate Party`)
+
+fit_3b <- glm.nb(data = d2_test,
+                  `Number of Treaties` ~ 
+                    `Military Spending` + 
+                    `President Party`*`Senate Party` + President)
+
+summary(fit_3a)
+summary(fit_3b)
+
+fitted_fit_3a <- predict(fit_3a) %>% 
+  as_tibble() %>% 
+  rename("fitted" = value) %>% 
+  pull(fitted)
+
+fitted_fit_3b <- predict(fit_3b) %>% 
+  as_tibble() %>% 
+  rename("fitted" = value) %>% 
+  pull(fitted)
+
+d2_test %>% 
+  ungroup() %>% 
+  mutate(fitted = fitted_fit_3a) %>% 
+  rename(number = `Number of Treaties`) %>% 
+  select(number, fitted) %>% 
+  mutate(residuals = number - fitted) %>% 
+  mutate(squares = residuals^2) %>% 
+  summarize(mean = mean(squares)) %>% 
+  summarize(RMSE = sqrt(mean))
+
+d2_test %>% 
+  ungroup() %>% 
+  mutate(fitted = fitted_fit_3b) %>% 
+  rename(number = `Number of Treaties`) %>% 
+  select(number, fitted) %>% 
+  mutate(residuals = number - fitted) %>% 
+  mutate(squares = residuals^2) %>% 
+  summarize(mean = mean(squares)) %>% 
+  summarize(RMSE = sqrt(mean))
+```
+
+## Workflow Model
+```{r}
+d_split <- initial_split(d2_test, prob = 0.8)
+d_train <- training(d_split)
+d_test <- testing(d_split)
+
+d_rec_1 <- recipe(`Number of Treaties` ~ `President Party` + 
+                  `Senate Party` + `Military Spending`, 
+                data = d_train) %>% 
+  step_dummy(all_nominal()) %>% 
+  step_interact(~ `Senate Party`:`President Party`)
+
+d_rec_2 <- recipe(`Number of Treaties` ~ `President Party` + 
+                  `Senate Party` + `Military Spending` + `President`, 
+                data = d_train) %>% 
+  step_dummy(all_nominal()) %>% 
+  step_interact(~ `Senate Party`:`President Party`)
+
+lm_model <-
+  linear_reg() %>% 
+  set_engine("lm") %>% 
+  set_mode("regression")
+
+lm_wflow_1 <- workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(d_rec_1)
+
+lm_wflow_2 <- workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(d_rec_2)
+
+lm_fit_1 <- fit(lm_wflow_1, d_train)
+
+lm_fit_2 <- fit(lm_wflow_2, d_train)
+
+d_test_pred_1 <- predict(lm_fit_1, new_data = d_test) %>% 
+  bind_cols(d_test %>%
+              select(`Number of Treaties`))
+
+d_test_pred_2 <- predict(lm_fit_2, new_data = d_test) %>% 
+  bind_cols(d_test %>%
+              select(`Number of Treaties`))
+
+rmse(d_test_pred_1, 
+     truth = `Number of Treaties in the Year`,
+     estimate = .pred)
+
+rmse(d_test_pred_2, 
+     truth = `Number of Treaties in the Year`,
+     estimate = .pred)
+```
+
+```{r}
+d2 %>% 
+  ggplot(aes(log(`Number of Treaties`))) +
+  geom_density()
+```
+
