@@ -118,3 +118,36 @@ mainPanel(
   ),
   width = 6
 )
+
+fluidPage(
+  selectInput("x", "X variable", columns),
+  selectInput("y", "Y variable", columns),
+  selectInput("geom", "geom", 
+              c("point", "column", "jitter", 
+                "bar"))
+  )
+
+column = 
+  geom_col(aes(y = fct_reorder(.data[[input$y]], 
+                               .data[["Year"]]),
+               alpha = subset(d, !is.na(action_type)) %>% 
+                 group_by(input$y) %>% 
+                 mutate(number = n()) %>% 
+                 pull(number)),
+           position = "dodge")
+
+output$plot2 <- renderPlot({
+  ggplot(data = subset(d, !is.na(action_type)), 
+         aes(fct_reorder(.data[[input$x]], .data[["Year"]]),
+             color = action_type, fill = action_type)) +
+    plot_geom() +
+    scale_fill_discrete(name = "Senate Action Taken") +
+    scale_color_discrete(name = "Senate Action Taken") +
+    scale_alpha_continuous(name = "Number of Treaties") +
+    theme_bw() +
+    theme(axis.text.x = element_text(size = 7.5, angle = -90),
+          axis.text.y = element_text(size = 7.5),
+          legend.position = "bottom") +
+    labs(x = input$x,
+         y = ifelse(input$geom == "bar", "Count", input$y))
+}, res = 96)
