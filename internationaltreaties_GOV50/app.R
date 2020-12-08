@@ -743,6 +743,7 @@ server <- function(input, output, session) {
                               values = c("blue", "red")) +
             theme_bw() +
             theme(legend.position = "bottom") +
+            scale_x_continuous(breaks = seq(1950, 2020, by = 10)) +
             labs(x = "Year")
     }, res = 96)
     
@@ -796,8 +797,7 @@ server <- function(input, output, session) {
                  x = paste("Coefficient of", input$v),
                  y = "Probability",
                  caption = "Used the 'stan_glm' function.") +
-            scale_y_continuous(labels = scales::percent_format(),
-                               breaks = seq(1950, 2020, by = 10))
+            scale_y_continuous(labels = scales::percent_format())
         }, res = 96)
     
     # Treaties and spending
