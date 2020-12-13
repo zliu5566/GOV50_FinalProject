@@ -319,11 +319,12 @@ ui <- navbarPage(
                           # previous one as I was figuring out my model. It 
                           # looks cool though, so I kept it.
                           
-                          h3("Correlation Between Spending and Treaties"),
+                          h3("Treaties vs. Spending"),
                           fluidPage(
                               plotOutput("plot4")
-                              )),
-                 
+                              )
+                          ),
+
                  # Honestly, I am still not quite sure what this graphic
                  # depicts, but the code for this was absurdly painful to
                  # write and it is visually spectacular, so here we go.
@@ -677,9 +678,8 @@ ui <- navbarPage(
                package PriceR to adjust for inflation on military spending."),
              h3("About the Author"),
              p(HTML(paste0(
-               "My name is Z. Liu, and I study many things. You can reach me 
-               when this project is done. In the meantime, please enjoy my
-               GitHub repository for this project ", 
+               "My name is Z. Liu, and I was a student in the year 2020. Please 
+               enjoy my GitHub repository for this project ", 
                a(href = 'https://github.com/zliu5566/US_Int.Treaties_Mil.Spending',
                  "here"), "."))))
     )
